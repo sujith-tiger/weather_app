@@ -74,9 +74,68 @@ export default function App() {
       try {
         const tempParam = currentUnit === "fahrenheit" ? "fahrenheit" : "celsius";
         const windParam = currentUnit === "fahrenheit" ? "mph" : "kmh";
-        const res = await fetch(
+        let res = await fetch(
           `/api/forecast?latitude=${city.latitude}&longitude=${city.longitude}&temperature_unit=${tempParam}&wind_speed_unit=${windParam}`
         );
+
+        if (!res.ok) {
+          // Direct fallback to Open-Meteo public API if proxy returns 404/error
+          const currentParams = [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "apparent_temperature",
+            "is_day",
+            "precipitation",
+            "rain",
+            "showers",
+            "snowfall",
+            "weather_code",
+            "cloud_cover",
+            "pressure_msl",
+            "surface_pressure",
+            "wind_speed_10m",
+            "wind_direction_10m",
+            "wind_gusts_10m",
+          ].join(",");
+
+          const dailyParams = [
+            "weather_code",
+            "temperature_2m_max",
+            "temperature_2m_min",
+            "apparent_temperature_max",
+            "apparent_temperature_min",
+            "sunrise",
+            "sunset",
+            "uv_index_max",
+            "precipitation_sum",
+            "rain_sum",
+            "showers_sum",
+            "snowfall_sum",
+            "precipitation_hours",
+            "precipitation_probability_max",
+            "wind_speed_10m_max",
+            "wind_gusts_10m_max",
+            "wind_direction_10m_dominant",
+          ].join(",");
+
+          const hourlyParams = [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "dew_point_2m",
+            "apparent_temperature",
+            "precipitation_probability",
+            "precipitation",
+            "weather_code",
+            "pressure_msl",
+            "cloud_cover",
+            "visibility",
+            "wind_speed_10m",
+            "uv_index",
+          ].join(",");
+
+          const fallbackUrl = `https://api.open-meteo.com/v1/forecast?latitude=${city.latitude}&longitude=${city.longitude}&current=${currentParams}&daily=${dailyParams}&hourly=${hourlyParams}&temperature_unit=${tempParam}&wind_speed_unit=${windParam}&precipitation_unit=mm&timezone=auto`;
+          res = await fetch(fallbackUrl);
+        }
 
         if (!res.ok) {
           throw new Error(`Failed to fetch weather data (${res.status})`);
@@ -200,11 +259,37 @@ export default function App() {
         }),
       });
 
-      if (!res.ok) throw new Error("AI Insights request failed");
+      if (!res.ok) throw new Error("AI Insights endpoint unavailable");
       const data = await res.json();
       setAiInsights(data);
     } catch (err) {
       console.error("AI Insights Error:", err);
+      // Fallback local weather insights
+      const isFahrenheit = currentUnit === "fahrenheit";
+      const isCold = isFahrenheit ? current.temperature < 60 : current.temperature < 15;
+      const isHot = isFahrenheit ? current.temperature > 82 : current.temperature > 28;
+
+      setAiInsights({
+        summary: `Conditions in ${locationName} feature ${current.weatherDescription.toLowerCase()} with temperatures around ${Math.round(current.temperature)}°${isFahrenheit ? "F" : "C"}.`,
+        bestWindow: "10:00 AM - 4:00 PM for outdoor movement",
+        outfit: {
+          top: isCold ? "Layered jacket or thermal sweater" : isHot ? "Breathable linen shirt or tee" : "Light jacket or casual shirt",
+          bottom: isHot ? "Breathable shorts or light chinos" : "Comfortable pants or denim",
+          footwear: current.precipitation > 0 ? "Waterproof boots or shoes" : "Comfortable walking sneakers",
+          accessories: current.uvIndex > 5 ? "UV-blocking sunglasses & SPF 30+" : current.precipitation > 0 ? "Compact umbrella" : "Polarized sunglasses",
+        },
+        activities: [
+          { name: "Outdoor Jogging", rating: current.precipitation > 0 ? "Moderate" : "Optimal", tip: current.precipitation > 0 ? "Wet ground, wear traction shoes" : "Ideal temperature for cardio" },
+          { name: "Cycling & Commute", rating: current.windSpeed > 25 ? "Moderate" : "Great", tip: current.windSpeed > 25 ? "Bustling wind gusts expected" : "Smooth commuting conditions" },
+          { name: "Café & Outdoor Dining", rating: "Optimal", tip: "Great atmospheric vibe today" },
+          { name: "Photography", rating: "Great", tip: "Soft lighting conditions for landscapes" },
+        ],
+        planningTips: [
+          "Monitor wind speed changes throughout the afternoon.",
+          "Keep hydrated during extended outdoor activity.",
+        ],
+        smartAlert: current.precipitation > 5 ? "Precipitation expected today. Stay prepared!" : null,
+      });
     } finally {
       setIsLoadingAi(false);
     }

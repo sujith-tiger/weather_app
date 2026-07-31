@@ -47,7 +47,14 @@ export const CitySearch: React.FC<CitySearchProps> = ({
     const timer = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/geocoding?name=${encodeURIComponent(query.trim())}&count=10`);
+        let res = await fetch(`/api/geocoding?name=${encodeURIComponent(query.trim())}&count=10`);
+        if (!res.ok) {
+          res = await fetch(
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+              query.trim()
+            )}&count=10&language=en&format=json`
+          );
+        }
         if (!res.ok) throw new Error("Geocoding failed");
         const data = await res.json();
         setResults(data.results || []);
