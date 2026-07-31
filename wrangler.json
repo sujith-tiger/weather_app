@@ -2,8 +2,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "weather-intelligence",
   "compatibility_date": "2026-07-31",
+  "build": {
+    "command": "npm run build"
+  },
   "assets": {
     "directory": "./dist"
-  },
-  "pages_build_output_dir": "./dist"
+  }
 }
